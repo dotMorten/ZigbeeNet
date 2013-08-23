@@ -3,69 +3,10 @@ using System.IO;
 
 namespace ZigbeeNet.Smartenit
 {
-	public abstract class ResponseItem
-	{
-		protected ResponseItem(byte[] payload) { Payload = payload; }
-
-		public static ResponseItem Parse(byte[] buffer, out uint bytesRead)
-		{
-			if (buffer == null)
-				throw new ArgumentNullException("buffer");
-			bytesRead = 0;
-			System.IO.BinaryReader br = new System.IO.BinaryReader(new MemoryStream(buffer));
-			var SOP = br.ReadByte();
-			if (SOP != 0x02)
-				throw new ArgumentException("Invalid SOP. Not a Zigbee response");
-			if (buffer.Length < 4)
-				return null;
-			var cmd = SwapUInt16(br.ReadUInt16());
-			var NACK = cmd & 32768;
-			var ACK = cmd & 16384;
-			var Response = cmd & 4096;
-			var CommandNumber = 4095 & cmd;
-			var LEN = br.ReadByte(); //pos=3
-			if (buffer.Length < 5 + LEN)
-				return null;
-			var payload = br.ReadBytes(LEN);
-			var fcs = br.ReadByte();
-			bytesRead = 5u + LEN;
-
-			var xor = XOR(buffer, 1u, bytesRead - 2u);
-			if ((xor ^ fcs) != 0)
-				throw new ArgumentException("Invalid message");
-			switch (cmd)
-			{
-				case 4096: return new PingResponse(payload);
-				case 4098: return new GetSystemTimeResponse(payload);
-				case 4099: return new SetSystemTimeResponse(payload);
-				default:
-					return new UnknownResponse(cmd, payload);
-			}
-		}
-
-		public byte[] Payload { get; set; }
-
-		public static ushort SwapUInt16(ushort v)
-		{
-			return (ushort)(((v & 0xff) << 8) | ((v >> 8) & 0xff));
-		}
-
-		public static int XOR(byte[] data, uint start, uint count)
-		{
-			int b = data[start];
-			for (int i = 1; i < count; i++)
-			{
-				b = b ^ data[start + i];
-			}
-			return b;
-		}
-		public override string ToString()
-		{
-			return string.Format("PAYL={0}", string.Join(",", Payload));
-		}
-	}
-
-	public class PingResponse : ResponseItem
+	/// <summary>
+	/// CID System Ping response
+	/// </summary>
+	public class PingResponse : CidResponseItem
 	{
 		internal PingResponse(byte[] payload)
 			: base(payload)
@@ -93,6 +34,7 @@ namespace ZigbeeNet.Smartenit
 			NodeNetworkAddress = BitConverter.ToUInt16(new byte[] { payload[6], payload[5] }, 0);
 			NodeIEEEAddress = BitConverter.ToUInt64(new byte[] { payload[14], payload[13], payload[12], payload[11], payload[10], payload[9], payload[8], payload[7] }, 0);
 		}
+
 		public bool CoordinatorCapability { get; private set; }
 		public bool FFD { get; private set; }
 		public bool NodeIsMainsPowered { get; private set; }
@@ -118,7 +60,10 @@ namespace ZigbeeNet.Smartenit
 		}
 	}
 
-	public class GetSystemTimeResponse : ResponseItem
+	/// <summary>
+	/// Get System Time Response
+	/// </summary>
+	public class GetSystemTimeResponse : CidResponseItem
 	{
 		private static DateTime Epoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 		internal GetSystemTimeResponse(byte[] payload)
@@ -135,28 +80,66 @@ namespace ZigbeeNet.Smartenit
 		}
 	}
 
-	public class SetSystemTimeResponse : ResponseItem
+	/// <summary>
+	/// Succeeded or Failed response
+	/// </summary>
+	public class SucceededFailedResponse : CidResponseItem
 	{
-		internal SetSystemTimeResponse(byte[] payload)
+		internal SucceededFailedResponse(byte[] payload)
 			: base(payload)
 		{
 			Success = payload[0] == 0;
 		}
+
+		/// <summary>
+		/// Gets a value indicating whether command was a success.
+		/// </summary>
+		/// <value>
+		///   <c>true</c> if success; otherwise, <c>false</c>.
+		/// </value>
 		public bool Success { get; private set; }
+
+		/// <summary>
+		/// Returns a <see cref="System.String" /> that represents this instance.
+		/// </summary>
+		/// <returns>
+		/// A <see cref="System.String" /> that represents this instance.
+		/// </returns>
 		public override string ToString()
 		{
 			return Success ? "SUCCESS" : "FAILED";
 		}
 	}
 
-	public class UnknownResponse : ResponseItem
+	/// <summary>
+	/// Set System Time Response
+	/// </summary>
+	public class SetSystemTimeResponse : SucceededFailedResponse
+	{
+		internal SetSystemTimeResponse(byte[] payload) : base(payload) { }
+	}
+
+	/// <summary>
+	/// An unknown response
+	/// </summary>
+	public class UnknownResponse : CidResponseItem
 	{
 		internal UnknownResponse(ushort cmd, byte[] payload)
 			: base(payload)
 		{
 			CMD = cmd;
 		}
+		/// <summary>
+		/// Response Command
+		/// </summary>
 		public ushort CMD { get; private set; }
+
+		/// <summary>
+		/// Returns a <see cref="System.String" /> that represents this instance.
+		/// </summary>
+		/// <returns>
+		/// A <see cref="System.String" /> that represents this instance.
+		/// </returns>
 		public override string ToString()
 		{
 			return string.Format("CMD={0},PAYL={1}", CMD, string.Join(",", Payload));

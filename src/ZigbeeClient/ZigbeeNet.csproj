@@ -39,7 +39,8 @@
     <Compile Include="Smartenit\CidClient.cs" />
     <Compile Include="Smartenit\CidPacket.cs" />
     <Compile Include="Smartenit\CidPackets.cs" />
-    <Compile Include="Smartenit\CidResponse.cs" />
+    <Compile Include="Smartenit\CidResponseItem.cs" />
+    <Compile Include="Smartenit\CidResponseItems.cs" />
     <Compile Include="ZigbeeClient.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

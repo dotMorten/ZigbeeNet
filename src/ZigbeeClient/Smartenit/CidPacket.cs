@@ -2,6 +2,9 @@
 
 namespace ZigbeeNet.Smartenit
 {
+	/// <summary>
+	/// A base CID packet for sending to the device
+	/// </summary>
 	public class CidPacket
 	{
 		public CidPacket(byte[] cmd, byte[] body)

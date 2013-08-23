@@ -5,15 +5,27 @@ using System.Text;
 
 namespace ZigbeeNet.Smartenit
 {
+	/// <summary>
+	///	Zigbee Client for Smartenit CID API devices
+	/// </summary>
     public class CidClient : ZigbeeClient, IDisposable
     {
 		private System.IO.Stream m_baseStream;
 		private List<byte> m_buffer = new List<byte>();
 
-		public CidClient(System.IO.Stream baseStream)
+		/// <summary>
+		/// Initializes a new instance of the <see cref="CidClient"/> class.
+		/// </summary>
+		/// <param name="outputStream">The RS-232 output stream to write to.</param>
+		public CidClient(System.IO.Stream outputStream)
 		{
-			m_baseStream = baseStream;
+			m_baseStream = outputStream;
 		}
+
+		/// <summary>
+		/// Call this when your device receives data
+		/// </summary>
+		/// <param name="buffer">The data received from the RS232 device</param>
 		public void OnDataRecieved(byte[] buffer)
 		{
 			m_buffer.AddRange(buffer);
@@ -23,7 +35,7 @@ namespace ZigbeeNet.Smartenit
 		private void ProcessBuffer()
 		{
 			uint bytesRead = 0;
-			var item = ResponseItem.Parse(m_buffer.ToArray(), out bytesRead);
+			var item = CidResponseItem.Parse(m_buffer.ToArray(), out bytesRead);
 			if (bytesRead > 0)
 			{
 				m_buffer.RemoveRange(0, (int)bytesRead);
@@ -37,13 +49,24 @@ namespace ZigbeeNet.Smartenit
 				ProcessBuffer();
 		}
 
-		public event EventHandler<ResponseItem> ResponseReceived;
+		/// <summary>
+		/// Raised when a message is received
+		/// </summary>
+		public event EventHandler<CidResponseItem> ResponseReceived;
 
+		/// <summary>
+		/// Performs application-defined tasks associated with freeing, releasing,
+		/// or resetting unmanaged resources.
+		/// </summary>
 		public void Dispose()
 		{
 			m_baseStream.Dispose();
 		}
 
+		/// <summary>
+		/// Sends a CID packet to the device.
+		/// </summary>
+		/// <param name="packet">The packet to send.</param>
 		public void SendPacket(CidPacket packet)
 		{
 			m_baseStream.Write(new byte[] { 0x02 }, 0, 1);
@@ -65,6 +88,5 @@ namespace ZigbeeNet.Smartenit
 				m_baseStream.Write(new byte[] { 0x00 }, 0, 1);
 			m_baseStream.Write(new byte[] { (byte)fcs }, 0, 1);
 		}
-
 	}
 }
