@@ -1,11 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 
 namespace ZigbeeNet.Smartenit
 {
 	/// <summary>
 	/// CID System Ping response
 	/// </summary>
+	[ResponseCmd(Command = 0x1000)]
 	public class PingResponse : CidResponseItem
 	{
 		internal PingResponse(byte[] payload)
@@ -58,11 +60,17 @@ namespace ZigbeeNet.Smartenit
 		{
 			return ((b & (byte)(1 << pos)) != 0);
 		}
+		public override string ToString()
+		{
+			return string.Format("NodeNetworkAddress: {0}\nNodeIEEEAddress: {1:x}\nZigbeeProfile: {2}\nNodeIsInRunningState: {3}",
+				NodeNetworkAddress, NodeIEEEAddress, ZigbeeProfile, NodeIsInRunningState);
+		}
 	}
 
 	/// <summary>
 	/// Get System Time Response
 	/// </summary>
+	[ResponseCmd(Command = 0x1002)]
 	public class GetSystemTimeResponse : CidResponseItem
 	{
 		private static DateTime Epoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -114,11 +122,57 @@ namespace ZigbeeNet.Smartenit
 	/// <summary>
 	/// Set System Time Response
 	/// </summary>
+	[ResponseCmd(Command = 0x1003)]
 	public class SetSystemTimeResponse : SucceededFailedResponse
 	{
 		internal SetSystemTimeResponse(byte[] payload) : base(payload) { }
 	}
 
+	/// <summary>
+	/// Set System Time Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1005)]
+	public class SystemStartNetworkResponse : CidResponseItem
+	{
+		internal SystemStartNetworkResponse(byte[] payload) : base(payload) { }
+
+		public byte Channel { get { return Payload[0]; } }
+		public ushort PanID
+		{
+			get
+			{
+				return BitConverter.ToUInt16(new byte[] { Payload[2], Payload[1] }, 0);
+			}
+		}
+		public ulong ExtendedPanID
+		{
+			get
+			{
+				return BitConverter.ToUInt64(
+					new byte[] { Payload[10], Payload[9], Payload[8], Payload[7], Payload[6], Payload[5], Payload[4], Payload[3] }, 0);
+			}
+		}
+
+		public override string ToString()
+		{
+			return string.Format("Pan ID: {0}, Extended Pan ID: {1:x}", PanID, ExtendedPanID);
+		}
+	}
+	/// <summary>
+	/// Set System Time Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1010)]
+	public class SystemModifyPermitJoinResponse : CidResponseItem
+	{
+		internal SystemModifyPermitJoinResponse(byte[] payload) : base(payload) { }
+
+		public byte PermitTime { get { return Payload[0]; } }
+
+		public override string ToString()
+		{
+			return string.Format("Permit time: {0}", PermitTime);
+		}
+	}
 	/// <summary>
 	/// An unknown response
 	/// </summary>
@@ -142,7 +196,12 @@ namespace ZigbeeNet.Smartenit
 		/// </returns>
 		public override string ToString()
 		{
-			return string.Format("CMD={0},PAYL={1}", CMD, string.Join(",", Payload));
+			return string.Format("CMD=0x{0:X4},PAYL=[{1}]", CMD, string.Join(",", Payload.Select(t=>t.ToString("X2"))));// string.Format("{0:xx}",(int)t))));
 		}
+	}
+
+	public class ResponseCmd : Attribute
+	{
+		public ushort Command { get; set; }
 	}
 }

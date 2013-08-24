@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Linq;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 
 namespace ZigbeeNet.Smartenit
 {
@@ -40,13 +43,37 @@ namespace ZigbeeNet.Smartenit
 			var xor = XOR(buffer, 1u, bytesRead - 2u);
 			if ((xor ^ fcs) != 0)
 				throw new ArgumentException("Invalid message");
-			switch (cmd)
+			if (CidResponseTypes == null)
+				LoadResponseTypes();
+			if (CidResponseTypes.ContainsKey(cmd))
 			{
-				case 4096: return new PingResponse(payload);
-				case 4098: return new GetSystemTimeResponse(payload);
-				case 4099: return new SetSystemTimeResponse(payload);
-				default:
-					return new UnknownResponse(cmd, payload);
+				var type = CidResponseTypes[cmd];
+				return type.Invoke(new object[] { payload }) as CidResponseItem;
+			}
+			else
+				return new UnknownResponse(cmd, payload);
+		}
+		private static Dictionary<ushort, ConstructorInfo> CidResponseTypes;
+
+		private static void LoadResponseTypes()
+		{
+			CidResponseTypes = new Dictionary<ushort, ConstructorInfo>();
+			var typeinfo = typeof(CidResponseItem).GetTypeInfo();
+			foreach (var subclass in typeinfo.Assembly.DefinedTypes.Where(t => t.IsSubclassOf(typeof(CidResponseItem))))
+			{
+				var attr = subclass.GetCustomAttribute<ResponseCmd>();
+				if (attr != null)
+				{
+					foreach (var c in subclass.DeclaredConstructors)
+					{
+						var pinfo = c.GetParameters();
+						if(pinfo.Length == 1 && pinfo[0].ParameterType == typeof(byte[]))
+						{
+							CidResponseTypes.Add(attr.Command, c);
+							break;
+						}
+					}
+				}
 			}
 		}
 
