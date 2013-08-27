@@ -60,11 +60,6 @@ namespace ZigbeeNet.Smartenit
 		{
 			return ((b & (byte)(1 << pos)) != 0);
 		}
-		public override string ToString()
-		{
-			return string.Format("NodeNetworkAddress: {0}\nNodeIEEEAddress: {1:x}\nZigbeeProfile: {2}\nNodeIsInRunningState: {3}",
-				NodeNetworkAddress, NodeIEEEAddress, ZigbeeProfile, NodeIsInRunningState);
-		}
 	}
 
 	/// <summary>
@@ -106,17 +101,6 @@ namespace ZigbeeNet.Smartenit
 		///   <c>true</c> if success; otherwise, <c>false</c>.
 		/// </value>
 		public bool Success { get; private set; }
-
-		/// <summary>
-		/// Returns a <see cref="System.String" /> that represents this instance.
-		/// </summary>
-		/// <returns>
-		/// A <see cref="System.String" /> that represents this instance.
-		/// </returns>
-		public override string ToString()
-		{
-			return Success ? "SUCCESS" : "FAILED";
-		}
 	}
 
 	/// <summary>
@@ -137,6 +121,7 @@ namespace ZigbeeNet.Smartenit
 		internal SystemStartNetworkResponse(byte[] payload) : base(payload) { }
 
 		public byte Channel { get { return Payload[0]; } }
+
 		public ushort PanID
 		{
 			get
@@ -155,7 +140,7 @@ namespace ZigbeeNet.Smartenit
 
 		public override string ToString()
 		{
-			return string.Format("Pan ID: {0}, Extended Pan ID: {1:x}", PanID, ExtendedPanID);
+			return string.Format("Pan ID: {0}, Extended Pan ID: {1:x}, Channel: {2}", PanID, ExtendedPanID, Channel);
 		}
 	}
 	/// <summary>
@@ -173,6 +158,110 @@ namespace ZigbeeNet.Smartenit
 			return string.Format("Permit time: {0}", PermitTime);
 		}
 	}
+	/// <summary>
+	/// End Device Announce Response
+	/// </summary>
+	[ResponseCmd(Command = 0x101B)]
+	public class EndDeviceAnnounceResponse : CidResponseItem
+	{
+		internal EndDeviceAnnounceResponse(byte[] payload) : base(payload) { }
+
+		public ushort DeviceAddress 
+		{
+			get { return BitHelpers.ToUInt16(Payload, 0); }
+		}
+		public ulong DeviceAddressIEEE
+		{
+			get { return BitHelpers.ToUInt64(Payload, 2); }
+		}
+		public bool CanBeCoordinator { get { return BitHelpers.GetBit(Payload[10], 0); } }
+		public bool IsFullFunctioningDevice { get { return BitHelpers.GetBit(Payload[10], 1); } }
+		public bool NodeIsMainsPowered { get { return BitHelpers.GetBit(Payload[10], 2); } }
+		public bool RxEnabledDuringIdlePeriods { get { return BitHelpers.GetBit(Payload[10], 3); } }
+		public bool HighSecurityEnabled { get { return BitHelpers.GetBit(Payload[10], 6); } }
+		public bool NetworkAddressShouldBeAllocatedToNode { get { return BitHelpers.GetBit(Payload[10], 7); } }
+	}
+
+	/// <summary>
+	/// Node Descriptor Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1014)]
+	public class NodeDescriptorResponse : SucceededFailedResponse
+	{
+		internal NodeDescriptorResponse(byte[] payload) : base(payload) { }
+
+		public ushort SourceAddress
+		{
+			get
+			{
+				return BitHelpers.ToUInt16(Payload, 1);
+			}
+		}
+		public byte MACCapabilityFlags { get { return Payload[5]; } }
+	}
+
+	/// <summary>
+	/// Simple Descriptor Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1015)]
+	public class SimpleDescriptorResponse : SucceededFailedResponse
+	{
+		internal SimpleDescriptorResponse(byte[] payload) : base(payload) { }
+
+		public ushort DestinationAddress
+		{
+			get { return BitHelpers.ToUInt16(Payload, 1); }
+		}
+		public byte AppEndpoint { get { return Payload[4]; } }
+		public ushort EndpointProfileID
+		{
+			get { return BitHelpers.ToUInt16(Payload, 5); }
+		}
+		public ushort EndpointDeviceID
+		{
+			get { return BitHelpers.ToUInt16(Payload, 7); }
+		}
+		//TODO...
+	}
+
+	/// <summary>
+	/// Device Joined Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1011)]
+	public class DeviceJoinedResponse : EndDeviceAnnounceResponse
+	{
+		internal DeviceJoinedResponse(byte[] payload) : base(payload) { }
+	}
+
+	/// <summary>
+	/// Node Descriptor Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1020)]
+	public class BindResponse : CidResponseItem
+	{
+		internal BindResponse(byte[] payload) : base(payload) { }
+
+		/// <summary>
+		/// Status of Bind request
+		/// </summary>
+		public BindStatus Status { get { return (BindStatus)Payload[0]; } }
+
+		public ushort SourceAddress
+		{
+			get
+			{
+				return BitHelpers.ToUInt16(Payload, 1);
+			}
+		}
+	
+		public enum BindStatus
+		{
+			Success = 0,
+			NotSupported = 1,
+			TableFull = 2
+		}
+	}
+	
 	/// <summary>
 	/// An unknown response
 	/// </summary>
@@ -203,5 +292,37 @@ namespace ZigbeeNet.Smartenit
 	public class ResponseCmd : Attribute
 	{
 		public ushort Command { get; set; }
+	}
+
+	internal static class BitHelpers
+	{
+		public static bool GetBit(byte b, int pos)
+		{
+			return ((b & (byte)(1 << pos)) != 0);
+		}
+
+		public static ushort ToUInt16(byte[] data, int pos)
+		{
+			return BitConverter.ToUInt16(new byte[] { data[pos+1], data[pos] }, 0);
+		}
+
+		public static ulong ToUInt64(byte[] data, int pos)
+		{
+			return BitConverter.ToUInt64(
+				new byte[] { data[pos + 7], data[pos + 6], data[pos + 5], data[pos+4],
+					data[pos+3], data[pos+2], data[pos+1], data[pos] }, 0);
+		}
+		public static byte[] GetBytes(UInt16 value)
+		{
+			var bytes = BitConverter.GetBytes(value);
+			return new byte[] { bytes[1],bytes[0] };
+		}
+		public static byte[] GetBytes(UInt64 value)
+		{
+			var bytes = BitConverter.GetBytes(value);
+			return new byte[] {
+				bytes[7],bytes[6],bytes[5],bytes[4],bytes[3],bytes[2],bytes[1],bytes[0]
+			};
+		}
 	}
 }
