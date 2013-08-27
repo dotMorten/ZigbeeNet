@@ -20,6 +20,7 @@ This project is in its very early stages. Only supports Smartenit CID API, and v
 			client.SendPacket(CidPackets.SystemGetTime);
 			client.SendPacket(CidPackets.SystemSetTime(DateTime.Now));
 			client.SendPacket(CidPackets.SystemGetTime);
+			client.SendPacket(CidPackets.SystemStartNetwork());
 		}
 
 		private void port_DataReceived(object sender, SerialDataReceivedEventArgs e)
