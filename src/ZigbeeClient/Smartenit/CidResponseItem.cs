@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 
 namespace ZigbeeNet.Smartenit
 {
@@ -108,7 +109,18 @@ namespace ZigbeeNet.Smartenit
 		/// </returns>
 		public override string ToString()
 		{
-			return string.Format("PAYL={0}", string.Join(",", Payload));
+			StringBuilder sb = new StringBuilder(string.Format("PAYL={0}", string.Join(",", Payload)));
+			var typeinfo = this.GetType().GetTypeInfo();
+			var props = this.GetType().GetRuntimeProperties();
+			foreach (var prop in props)
+			{
+				if (prop.Name == "Payload") continue;
+				var val = prop.GetValue(this);
+				if (val is UInt64) //display ulong as hex
+					val = string.Format("{0:X8}", val);
+				sb.AppendFormat("\n\t{0}: {1}", prop.Name, val);
+			}
+			return sb.ToString();
 		}
 	}
 }
