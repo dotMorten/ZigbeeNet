@@ -1,4 +1,5 @@
 ﻿
+using System;
 namespace ZigbeeNet
 {
 	/// <summary>
@@ -6,5 +7,6 @@ namespace ZigbeeNet
 	/// </summary>
     public abstract class ZigbeeClient
     {
+		//public event EventHandler 
     }
 }

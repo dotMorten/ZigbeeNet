@@ -37,14 +37,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AttributeRecord.cs" />
+    <Compile Include="AttributesCollection.cs" />
     <Compile Include="BitHelpers.cs" />
+    <Compile Include="Clusters\ClusterIDAttribute.cs" />
+    <Compile Include="Clusters\RelativeHumidityMeasurement.cs" />
+    <Compile Include="Clusters\TemperatureMeasurement.cs" />
     <Compile Include="Smartenit\CidClient.cs" />
     <Compile Include="Smartenit\CidPacket.cs" />
     <Compile Include="Smartenit\CidPackets.cs" />
-    <Compile Include="Smartenit\CidResponseItem.cs" />
     <Compile Include="Smartenit\CidResponseItems.cs" />
+    <Compile Include="ZigbeeCommands.cs" />
     <Compile Include="ZigbeeClient.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ZigbeeCommand.cs" />
     <Compile Include="ZigbeeDataType.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
