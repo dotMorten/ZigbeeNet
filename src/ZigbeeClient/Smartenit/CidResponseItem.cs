@@ -51,27 +51,49 @@ namespace ZigbeeNet.Smartenit
 				var type = CidResponseTypes[cmd];
 				return type.Invoke(new object[] { payload }) as CidResponseItem;
 			}
+			else if (CidResponseCreators.ContainsKey(cmd))
+			{
+				var type = CidResponseCreators[cmd];
+				return type.Invoke(null, new object[] { payload }) as CidResponseItem;
+			}
 			else
 				return new UnknownResponse(cmd, payload);
 		}
 		private static Dictionary<ushort, ConstructorInfo> CidResponseTypes;
-
+		private static Dictionary<ushort, MethodInfo> CidResponseCreators;
+		
 		private static void LoadResponseTypes()
 		{
 			CidResponseTypes = new Dictionary<ushort, ConstructorInfo>();
+			CidResponseCreators = new Dictionary<ushort, MethodInfo>();
 			var typeinfo = typeof(CidResponseItem).GetTypeInfo();
 			foreach (var subclass in typeinfo.Assembly.DefinedTypes.Where(t => t.IsSubclassOf(typeof(CidResponseItem))))
 			{
-				var attr = subclass.GetCustomAttribute<ResponseCmd>();
+				var attr = subclass.GetCustomAttribute<ResponseCmd>(false);
 				if (attr != null)
 				{
-					foreach (var c in subclass.DeclaredConstructors)
+					if (subclass.IsAbstract)
 					{
-						var pinfo = c.GetParameters();
-						if(pinfo.Length == 1 && pinfo[0].ParameterType == typeof(byte[]))
+						var method = subclass.GetDeclaredMethod("Create");
+						if (method != null && method.IsStatic)
 						{
-							CidResponseTypes.Add(attr.Command, c);
-							break;
+							var pinfo = method.GetParameters();
+							if (pinfo.Length == 1 && pinfo[0].ParameterType == typeof(byte[]))
+							{
+								CidResponseCreators.Add(attr.Command, method);
+							}
+						}
+					}
+					else
+					{
+						foreach (var c in subclass.DeclaredConstructors)
+						{
+							var pinfo = c.GetParameters();
+							if (pinfo.Length == 1 && pinfo[0].ParameterType == typeof(byte[]))
+							{
+								CidResponseTypes.Add(attr.Command, c);
+								break;
+							}
 						}
 					}
 				}

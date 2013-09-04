@@ -36,6 +36,8 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AttributeRecord.cs" />
+    <Compile Include="BitHelpers.cs" />
     <Compile Include="Smartenit\CidClient.cs" />
     <Compile Include="Smartenit\CidPacket.cs" />
     <Compile Include="Smartenit\CidPackets.cs" />
@@ -43,6 +45,7 @@
     <Compile Include="Smartenit\CidResponseItems.cs" />
     <Compile Include="ZigbeeClient.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ZigbeeDataType.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

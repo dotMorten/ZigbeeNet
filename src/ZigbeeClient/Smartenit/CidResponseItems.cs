@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace ZigbeeNet.Smartenit
 {
@@ -261,14 +263,126 @@ namespace ZigbeeNet.Smartenit
 			TableFull = 2
 		}
 	}
-	
+
+	[ResponseCmd(Command = 0x1031)]
+	public abstract class AttributeBaseResponse : CidResponseItem
+	{
+		private class UnknownAttributeResponse : AttributeBaseResponse
+		{
+			public UnknownAttributeResponse(byte[] payload) : base(payload) { }
+		}
+		public static AttributeBaseResponse Create(byte[] payload)
+		{
+			bool isManufacturerSpecific = BitHelpers.GetBit(payload[0], 6);
+			var commandID = isManufacturerSpecific ? payload[7] : payload[6];
+			switch (commandID)
+			{
+				case 0x01: return new ReadAttributesResponse(payload);
+				case 0x0A: return new ReportAttributesResponse(payload);
+				case 0x0D: return new DiscoverAttributesResponse(payload);
+				default: return new UnknownAttributeResponse(payload);
+			}
+		}
+		internal AttributeBaseResponse(byte[] payload)
+			: base(payload) 
+		{
+		}
+		public bool IsManufacturerSpecific { get; private set; }
+
+		public ushort ManufacturerCode
+		{
+			get
+			{
+				if (IsManufacturerSpecific)
+					return BitHelpers.ToUInt16(Payload, 1);
+				else
+					return 0;
+			}
+		}
+		public UInt16 SourceAddress
+		{
+			get { return BitHelpers.ToUInt16(Payload, IsManufacturerSpecific ? 2 : 1); }
+		}
+		public byte SourceEndpoint { get { return IsManufacturerSpecific ? Payload[4] : Payload[3]; } }
+		public UInt16 ClusterID
+		{
+			get { return BitHelpers.ToUInt16(Payload, IsManufacturerSpecific ? 5 : 4); }
+		}
+		public byte CommandID { get { return IsManufacturerSpecific ? Payload[7] : Payload[6]; } }
+		//CommandID:
+		//0x0D = DiscoverAttributesResponse 
+		//0x0B = Default
+		//0x01 = ReadAttributesResponse
+		//0x04 = WriteAttributesResponse
+		//0x07 = ConfigureReportingResponse
+		//0x09 = ReadReportingConfigureResponse
+		//0x0A = ReadAttributesMessageResponse
+	}
+	//CMD == 0x0D
+	public class DiscoverAttributesResponse : AttributeBaseResponse
+	{
+		public DiscoverAttributesResponse(byte[] payload) : base(payload) { }
+		public byte AttributeCount { get { return IsManufacturerSpecific ? Payload[8] : Payload[7]; } }
+		public bool IsListComplete { get { return (IsManufacturerSpecific ? Payload[9] : Payload[8]) == 0x01; } }
+	}
+	public class ReadAttributesResponse : AttributeBaseResponse
+	{
+		public ReadAttributesResponse(byte[] payload) : base(payload) { }
+		public byte AttributeCount { get { return IsManufacturerSpecific ? Payload[8] : Payload[7]; } }
+		public bool IsListComplete { get { return (IsManufacturerSpecific ? Payload[9] : Payload[8]) == 0x01; } }
+	}
+	public class ReportAttributesResponse : AttributeBaseResponse
+	{
+		public ReportAttributesResponse(byte[] payload)
+			: base(payload)
+		{
+			int start = IsManufacturerSpecific ? 9 : 8;
+			var attr = new List<AttributeRecord>(AttributeCount);
+			for (int i = 0; i < AttributeCount; i++)
+			{
+				int length = 0;
+				AttributeRecord rec = new AttributeRecord(payload, start, out length);
+				attr.Add(rec);
+				start += length;
+			}
+			Attributes = new AttributesCollection(attr);
+		}
+		public byte AttributeCount { get { return IsManufacturerSpecific ? Payload[8] : Payload[7]; } }
+		public AttributesCollection Attributes { get; private set; }
+	}
+	public class AttributesCollection : IEnumerable<AttributeRecord>
+	{
+		private IEnumerable<AttributeRecord> m_records;
+		public AttributesCollection(IEnumerable<AttributeRecord> records)
+		{ m_records = records; }
+
+
+		public IEnumerator<AttributeRecord> GetEnumerator()
+		{
+			foreach (var r in m_records)
+				yield return r;
+		}
+
+		System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+		{
+			foreach (var r in m_records)
+				yield return m_records;
+		}
+		public override string ToString()
+		{
+			StringBuilder sb = new StringBuilder();
+			foreach (var r in m_records)
+				sb.AppendLine(r.ToString());
+			return sb.ToString();
+		}
+	}
+
 	/// <summary>
 	/// An unknown response
 	/// </summary>
 	public class UnknownResponse : CidResponseItem
 	{
-		internal UnknownResponse(ushort cmd, byte[] payload)
-			: base(payload)
+		internal UnknownResponse(ushort cmd, byte[] payload) : base(payload)
 		{
 			CMD = cmd;
 		}
@@ -294,35 +408,4 @@ namespace ZigbeeNet.Smartenit
 		public ushort Command { get; set; }
 	}
 
-	internal static class BitHelpers
-	{
-		public static bool GetBit(byte b, int pos)
-		{
-			return ((b & (byte)(1 << pos)) != 0);
-		}
-
-		public static ushort ToUInt16(byte[] data, int pos)
-		{
-			return BitConverter.ToUInt16(new byte[] { data[pos+1], data[pos] }, 0);
-		}
-
-		public static ulong ToUInt64(byte[] data, int pos)
-		{
-			return BitConverter.ToUInt64(
-				new byte[] { data[pos + 7], data[pos + 6], data[pos + 5], data[pos+4],
-					data[pos+3], data[pos+2], data[pos+1], data[pos] }, 0);
-		}
-		public static byte[] GetBytes(UInt16 value)
-		{
-			var bytes = BitConverter.GetBytes(value);
-			return new byte[] { bytes[1],bytes[0] };
-		}
-		public static byte[] GetBytes(UInt64 value)
-		{
-			var bytes = BitConverter.GetBytes(value);
-			return new byte[] {
-				bytes[7],bytes[6],bytes[5],bytes[4],bytes[3],bytes[2],bytes[1],bytes[0]
-			};
-		}
-	}
 }

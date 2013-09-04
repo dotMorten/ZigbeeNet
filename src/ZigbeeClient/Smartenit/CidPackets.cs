@@ -147,6 +147,37 @@ namespace ZigbeeNet.Smartenit
 			return new CidPacket(new byte[] { 0x00, 0x20 }, data.ToArray() );
 		}
 
+		public static CidPacket ReadAttributesRequest(
+			DiscoverAttributesResponse resp)
+		{
+			byte[] u8Mode = new byte[] { resp.Payload[0] };
+			byte[] manufacturerCode = BitHelpers.GetBytes(resp.ManufacturerCode);
+			byte[] dstAdd = BitHelpers.GetBytes(resp.SourceAddress);
+			byte[] dstEpt = new byte[] { resp.SourceEndpoint };
+			byte[] clstrID = BitHelpers.GetBytes(resp.ClusterID);
+			byte[] cmdId = new byte[] { 0 };
+			byte[] attrbs = new byte[] { resp.AttributeCount };
+			byte[] attrList = new byte[2 * resp.AttributeCount];
+			for (int i = 0; i < resp.AttributeCount; i++)
+			{
+				byte[] id = new byte[] { 0x00, 0x00 }; // BitHelpers.GetBytes(resp.ClusterID);
+				attrList[i * 2] = id[0];
+				attrList[i * 2 + 1] = id[1];
+			}
+			IEnumerable<byte> data = null;
+			if (resp.IsManufacturerSpecific)
+			{
+				data = Merge(new byte[][] { u8Mode, manufacturerCode, dstAdd, 
+				dstEpt, clstrID, cmdId, attrbs, attrList });
+			}
+			else
+			{
+				data = Merge(new byte[][] { u8Mode, dstAdd, 
+				dstEpt, clstrID, cmdId, attrbs, attrList });
+			}
+			return new CidPacket(new byte[] { 0x00, 0x30 }, data.ToArray());
+		}
+
 		private static IEnumerable<byte> Merge(IEnumerable<byte[]> arrays)
 		{
 			foreach (var array in arrays)
