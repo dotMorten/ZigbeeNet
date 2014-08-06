@@ -40,8 +40,9 @@
     <Compile Include="AttributesCollection.cs" />
     <Compile Include="BitHelpers.cs" />
     <Compile Include="Clusters\ClusterIDAttribute.cs" />
+    <Compile Include="Clusters\ClusterIDs.cs" />
     <Compile Include="Clusters\RelativeHumidityMeasurement.cs" />
-    <Compile Include="Clusters\TemperatureMeasurement.cs" />
+    <Compile Include="TemperatureMeasurement.cs" />
     <Compile Include="Smartenit\CidClient.cs" />
     <Compile Include="Smartenit\CidPacket.cs" />
     <Compile Include="Smartenit\CidPackets.cs" />

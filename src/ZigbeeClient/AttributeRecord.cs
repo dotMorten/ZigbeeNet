@@ -8,11 +8,14 @@ namespace ZigbeeNet
 {
 	public class AttributeRecord
 	{
-		internal AttributeRecord(byte[] data, int start, out int length)
+		internal AttributeRecord(byte[] data, int start, out int length, bool includeStatusByte = false)
 		{
 			AttributeID = BitHelpers.ToUInt16(data, start);
-			DataType = (ZigbeeDataType)data[start + 2];
-			length = 3;
+			if (includeStatusByte)
+				Success = data[start + 1] == 0x00;
+			int offset = includeStatusByte ? 1 : 0;
+			DataType = (ZigbeeDataType)data[start + 2 + offset];
+			length = 3 + offset;
 			
 			switch (DataType)
 			{
@@ -69,9 +72,14 @@ namespace ZigbeeNet
 					Data = BitHelpers.ToUInt32(data, start + length);
 					length += 4;
 					break;
+				case ZigbeeDataType.UInt48:
+					Data = BitHelpers.ToUInt64((new byte[] {0x00,0x00}).Concat(data.Skip(start + length).Take(6)).ToArray(), 0);
+					System.Diagnostics.Debug.WriteLine("UInt48 not supported");
+					length += 6;
+					break;
 				case ZigbeeDataType.UInt64:
 					Data = BitHelpers.ToUInt64(data, start + length);
-					length += 4;
+					length += 8;
 					break;
 				case ZigbeeDataType.Int16:
 					Data = BitHelpers.ToInt16(data, start + length);

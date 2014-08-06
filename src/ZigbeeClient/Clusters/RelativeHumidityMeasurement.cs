@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ZigbeeNet.Clusters
 {
-	[ClusterID(ID = 0x0405)]
+	[ClusterID(ID = (ushort)ClusterID.RelativeHumidityMeasurement)]
 	public class RelativeHumidityMeasurement
 	{
 		public RelativeHumidityMeasurement(AttributesCollection coll)

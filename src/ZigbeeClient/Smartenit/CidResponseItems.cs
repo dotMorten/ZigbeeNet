@@ -99,7 +99,10 @@ namespace ZigbeeNet.Smartenit
 	[ResponseCmd(Command = 0x1005)]
 	public class SystemStartNetworkResponse : ZigbeeCommand
 	{
-		internal SystemStartNetworkResponse(byte[] payload) : base(payload) { }
+		internal SystemStartNetworkResponse(byte[] payload) : base(payload) {
+			if (payload.Length != 11)
+				throw new ArgumentOutOfRangeException();
+		}
 
 		public byte Channel { get { return Payload[0]; } }
 
@@ -140,7 +143,185 @@ namespace ZigbeeNet.Smartenit
 			return string.Format("Permit time: {0}", PermitTime);
 		}
 	}
+	/// <summary>
+	/// Set System Time Response
+	/// </summary>
+	[ResponseCmd(Command = 0x101E)]
+	public class ActiveNetworkTableResponse : SucceededFailedResponse
+	{
+		internal ActiveNetworkTableResponse(byte[] payload)
+			: base(payload)
+		{
+		}
 
+		/// <summary>
+		/// The message’s source network address
+		/// </summary>
+		public ushort SourceAddress
+		{
+			get
+			{
+				return BitConverter.ToUInt16(new byte[] { Payload[2], Payload[1] }, 0);
+			}
+		}
+		public byte NetworkTableTotalSize
+		{
+			get { return Payload[3]; }
+		}
+		public byte StartIndex
+		{
+			get { return Payload[4]; }
+		}
+		public IEnumerable<NetworkTableEntry> NetworkTable
+		{
+			get
+			{
+				var tableLength = Payload[5];
+				var tablePayload = Payload.Skip(6);
+				for (int i = 0; i < tableLength; i++)
+				{
+					var data = tablePayload.Skip(i * 22).Take(22);
+					yield return new NetworkTableEntry(data.ToArray());
+				}
+			}
+		}
+		public static string ToBinaryString(byte b)
+		{
+			char[] str = new char[8];
+			str[7] = (b & 1)   > 0 ? '1' : '0';
+			str[6] = (b & 2)   > 0 ? '1' : '0';
+			str[5] = (b & 4)   > 0 ? '1' : '0';
+			str[4] = (b & 8)   > 0 ? '1' : '0';
+			str[3] = (b & 16)  > 0 ? '1' : '0';
+			str[2] = (b & 32)  > 0 ? '1' : '0';
+			str[1] = (b & 64)  > 0 ? '1' : '0';
+			str[0] = (b & 128) > 0 ? '1' : '0';
+			return new string(str);
+		}
+		public class NetworkTableEntry
+		{
+			internal NetworkTableEntry(byte[] Payload)
+			{
+				ExtendedPanID = BitConverter.ToUInt64(Payload.Take(8).Reverse().ToArray(), 0);
+				IEEEAddress = BitConverter.ToUInt64(Payload.Skip(8).Take(8).Reverse().ToArray(), 0);
+				ShortAddress = BitConverter.ToUInt16(Payload.Skip(16).Take(2).Reverse().ToArray(), 0);
+				var flags2 = Payload.Skip(18).First();
+				var flags1 = Payload.Skip(19).First();
+				Flags = ToBinaryString(flags1) + " " + ToBinaryString(flags2);
+				Type = (ZigBeeDeviceType)(flags1 & 3); //bits 0,1
+				RxOnWhenIdle = (flags1 & 12) >> 3 == 1; //bits 2,3
+				NeighborRelationShip = (RelationShip)((flags1 & 112) >> 5); //bits 4,5,6
+				PermitJoining = (flags2 & 3) == 1; //bits 8,9
+				Depth = Payload[20];
+				LinkQuality = Payload[21];
+			}
+
+			public ulong ExtendedPanID { get; private set; }
+			public ulong IEEEAddress { get; private set; }
+			public ushort ShortAddress { get; private set; }
+			public byte Depth { get; private set; }
+			public byte LinkQuality { get; private set; }
+			public ZigBeeDeviceType Type { get; private set; }
+			public bool RxOnWhenIdle { get; private set; }
+			public string Flags { get; private set; }
+			public RelationShip NeighborRelationShip { get; private set; }
+			public override string ToString()
+			{
+				return ZigbeeCommand.ObjectToString(this, new string[] { });
+			}
+			public bool PermitJoining { get; private set; }
+
+			public enum ZigBeeDeviceType : byte
+			{
+				Coordinator = 0,
+				Router = 1, 
+				EndDevice = 2
+			}
+			public enum RelationShip : short 
+			{
+				NeighborIsParent = 0, 
+				NeighborIsChild = 1, 
+				NeighborIsSibling = 2, 
+				NoneOfTheAbove = 3, 
+				Unknown = 4
+			}
+		}
+	}
+	/// <summary>
+	/// Set System Time Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1016)]
+	public class ActiveEndpointResponse : SucceededFailedResponse
+	{
+		internal ActiveEndpointResponse(byte[] payload)
+			: base(payload)
+		{
+		}
+
+		/// <summary>
+		/// Network address of the destination queried
+		/// </summary>
+		public ushort Interest
+		{
+			get
+			{
+				return BitConverter.ToUInt16(new byte[] { Payload[2], Payload[1] }, 0);
+			}
+		}
+
+
+		/// <summary>
+		/// Endpoints IDs in the queried device 
+		/// </summary>
+		public byte[] Endpoints { get { return Payload.Skip(4).ToArray(); } }
+	}
+		/// <summary>
+	/// Set System Time Response
+	/// </summary>
+	[ResponseCmd(Command = 0x1023)]
+	public class BindTableResponse : SucceededFailedResponse
+	{
+		internal BindTableResponse(byte[] payload)
+			: base(payload)
+		{
+		}
+
+		/// <summary>
+		/// The message’s source network address
+		/// </summary>
+		public ushort SourceAddress
+		{
+			get
+			{
+				return BitConverter.ToUInt16(new byte[] { Payload[2], Payload[1] }, 0);
+			}
+		}
+		public ushort TotalCount
+		{
+			get
+			{
+				return BitConverter.ToUInt16(new byte[] { Payload[4], Payload[2] }, 0);
+			}
+		}
+
+		public ushort StartIndex
+		{
+			get
+			{
+				return BitConverter.ToUInt16(new byte[] { Payload[6], Payload[5] }, 0);
+			}
+		}
+
+		public byte[] BindList
+		{
+			get
+			{
+				var count = BitConverter.ToUInt16(new byte[] { Payload[6], Payload[5] }, 0);
+				var payload = Payload.Skip(7).ToArray();
+				return payload;
+			}
+		}
+	}
 	/// <summary>
 	/// An unknown response
 	/// </summary>

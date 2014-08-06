@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace ZigbeeNet.Clusters
 {
-	[ClusterID(ID = 0x0402)]
+	[ClusterID(ID = (ushort)ClusterID.TemperatureMeasurement)]
 	public class TemperatureMeasurement
 	{
 		public TemperatureMeasurement(AttributesCollection coll)

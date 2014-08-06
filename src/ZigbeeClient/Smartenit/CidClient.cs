@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace ZigbeeNet.Smartenit
 {
@@ -37,7 +38,7 @@ namespace ZigbeeNet.Smartenit
 		private void ProcessBuffer()
 		{
 			uint bytesRead = 0;
-			var item = Parse(m_buffer.ToArray(), out bytesRead);
+			ZigbeeCommand item = Parse(m_buffer.ToArray(), out bytesRead);
 			if (bytesRead > 0)
 			{
 				m_buffer.RemoveRange(0, (int)bytesRead);
@@ -46,6 +47,15 @@ namespace ZigbeeNet.Smartenit
 			{
 				if (ResponseReceived != null)
 					ResponseReceived(this, item);
+				ushort cmd;
+				if (item is UnknownCidResponse)
+					cmd = (item as UnknownCidResponse).CMD;
+				else
+					cmd = item.GetType().GetTypeInfo().GetCustomAttribute<ResponseCmd>().Command;
+				System.Diagnostics.Debug.WriteLine("Received: 0x{0:X2}\tPAYLOAD: [{1}]",
+					cmd,
+					item.Payload  == null ? "<EMPTY>" : string.Join(",", (from c in item.Payload select c.ToString("X2"))));
+
 			}
 			if (bytesRead > 0 && m_buffer.Count > 0)
 				ProcessBuffer();
@@ -78,11 +88,24 @@ namespace ZigbeeNet.Smartenit
 			if ((xor ^ fcs) != 0)
 				throw new ArgumentException("Invalid message");
 			if (CidResponseTypes == null)
-				LoadResponseTypes();
+			{
+				lock (lockObject)
+				{
+					if (CidResponseTypes == null)
+						LoadResponseTypes();
+				}
+			}
 			if (CidResponseTypes.ContainsKey(cmd))
 			{
 				var type = CidResponseTypes[cmd];
-				return type.Invoke(new object[] { payload }) as ZigbeeCommand;
+				try
+				{
+					return type.Invoke(new object[] { payload }) as ZigbeeCommand;
+				}
+				catch (System.Exception ex)
+				{
+					return new UnknownCidResponse(cmd, payload);
+				}
 			}
 			else if (CidResponseCreators.ContainsKey(cmd))
 			{
@@ -110,7 +133,7 @@ namespace ZigbeeNet.Smartenit
 
 		private static Dictionary<ushort, ConstructorInfo> CidResponseTypes;
 		private static Dictionary<ushort, MethodInfo> CidResponseCreators;
-
+		private static object lockObject = new object();
 		private static void LoadResponseTypes()
 		{
 			CidResponseTypes = new Dictionary<ushort, ConstructorInfo>();
@@ -162,7 +185,30 @@ namespace ZigbeeNet.Smartenit
 		{
 			m_baseStream.Dispose();
 		}
-
+		public Task<T> SendPacketAndReceiveAsync<T>(CidPacket packet, int timeout = 60) where T : ZigbeeCommand
+		{
+			TaskCompletionSource<T> tcs = new TaskCompletionSource<T>();
+			EventHandler<ZigbeeCommand> handler = null;
+			handler = (s, e) =>
+				{
+					if(e.GetType() == typeof(T))
+					{
+						ResponseReceived -= handler;
+						tcs.SetResult((T)e);
+					}
+				};
+			Task.Delay(timeout * 1000).ContinueWith(_ =>
+			{
+				if (!tcs.Task.IsCompleted && !tcs.Task.IsCanceled)
+				{
+					ResponseReceived -= handler;
+					tcs.SetException(new TimeoutException());
+				};
+			});
+			ResponseReceived += handler;
+			SendPacket(packet);
+			return tcs.Task;
+		}
 		/// <summary>
 		/// Sends a CID packet to the device.
 		/// </summary>
@@ -186,7 +232,11 @@ namespace ZigbeeNet.Smartenit
 			}
 			else
 				m_baseStream.Write(new byte[] { 0x00 }, 0, 1);
+			fcs = 0xFF;
 			m_baseStream.Write(new byte[] { (byte)fcs }, 0, 1);
+			System.Diagnostics.Debug.WriteLine("Sending CMD: 0x{0}\tPAYLOAD: [{1}]",
+				string.Join("", (from c in packet.Command select c.ToString("X2"))), 
+				packet.Body == null ? "<EMPTY>" : string.Join(",", (from c in packet.Body select c.ToString("X2"))));
 		}
 	}
 }

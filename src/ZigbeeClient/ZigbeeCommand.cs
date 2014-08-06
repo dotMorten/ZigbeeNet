@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Reflection;
+using System.Collections;
 
 namespace ZigbeeNet
 {
@@ -31,16 +32,56 @@ namespace ZigbeeNet
 		/// </returns>
 		public override string ToString()
 		{
-			StringBuilder sb = new StringBuilder(string.Format("PAYL={0}", string.Join(",", Payload)));
-			var typeinfo = this.GetType().GetTypeInfo();
-			var props = this.GetType().GetRuntimeProperties();
+			StringBuilder sb = new StringBuilder(string.Format("PAYL={0}", string.Join(",", Payload.Select(b=>b.ToString("X2")))));
+			sb.Append("\n\t");
+			sb.Append(ObjectToString(this, new string[] { "Payload" }).Replace("\n","\n\t"));
+			return sb.ToString();
+		}
+		public static string ObjectToString(object o, string[] filter)
+		{
+			StringBuilder sb = new StringBuilder();
+			var typeinfo = o.GetType().GetTypeInfo();
+			var props = o.GetType().GetRuntimeProperties();
 			foreach (var prop in props)
 			{
-				if (prop.Name == "Payload") continue;
-				var val = prop.GetValue(this);
-				if (val is UInt64) //display ulong as hex
-					val = string.Format("{0:X8}", val);
-				sb.AppendFormat("\n\t{0}: {1}", prop.Name, val);
+				if(filter.Contains(prop.Name))
+					continue;
+				try
+				{
+					if (sb.Length > 0)
+						sb.AppendFormat("\n");
+					sb.AppendFormat("{0}: ", prop.Name);
+					var val = prop.GetValue(o);
+					if (val is UInt64) //display ulong as hex
+						sb.AppendFormat("{0:X8}", val);
+					else if(val is byte[])
+					{
+						sb.AppendFormat("[{0}]", string.Join(",", (byte[])val));
+					}
+					else if (val is Clusters.ClusterID[])
+					{
+						sb.AppendFormat("[{0}]", string.Join(",", (Clusters.ClusterID[])val));
+					}
+					else if (val is ushort[])
+					{
+						sb.AppendFormat("[{0}]", string.Join(",", (ushort[])val));
+					}
+					else if (val is IEnumerable && !(val is string)) // && !val.GetType().IsArray)
+					{
+						int i = 0;
+						foreach (var item in (IEnumerable)val)
+						{
+							sb.AppendFormat("\n  [{0}]\t{1}",i++, item.ToString().Replace("\n", "\n\t"));
+						}
+					}
+					else
+						sb.AppendFormat("{0}", val);
+
+				}
+				catch (System.Exception ex)
+				{
+					sb.AppendFormat("{0}: ERROR: {1}", prop.Name, ex.Message);
+				}
 			}
 			return sb.ToString();
 		}
